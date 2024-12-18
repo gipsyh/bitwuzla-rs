@@ -1,0 +1,9 @@
+[package]
+name = "bitwuzla-rs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+[build-dependencies]
+giputils = "0.2.2"
