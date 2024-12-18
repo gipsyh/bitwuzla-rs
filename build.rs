@@ -30,7 +30,17 @@ fn main() -> Result<(), String> {
         "cargo:rustc-link-search=native={}",
         cb_path.join("build").join("src").display()
     );
+    println!(
+        "cargo:rustc-link-search=native={}",
+        cb_path.join("build").join("src").join("lib").display()
+    );
     println!("cargo:rustc-link-lib=static=bitwuzla");
+    println!("cargo:rustc-link-lib=static=bzlautil");
+    println!("cargo:rustc-link-lib=static=bitwuzlabb");
+    println!("cargo:rustc-link-lib=static=bitwuzlabv");
+    println!("cargo:rustc-link-lib=static=bitwuzlals");
+    println!("cargo:rustc-link-lib=static=bzlarng");
     println!("cargo:rustc-link-lib=dylib=stdc++");
+    println!("cargo:rustc-link-lib=dylib=gmp");
     Ok(())
 }
