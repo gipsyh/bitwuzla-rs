@@ -5,10 +5,7 @@ use giputils::build::copy_build;
 use std::process::Command;
 
 fn main() -> Result<(), String> {
-    Command::new("git")
-        .args(["submodule", "update", "--init"])
-        .status()
-        .unwrap();
+    giputils::build::git_submodule_update()?;
     println!("cargo:rerun-if-changed=./bitwuzla");
     let cb_path = copy_build("bitwuzla", |src| {
         Command::new("python3")
