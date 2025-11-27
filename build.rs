@@ -39,5 +39,6 @@ fn main() -> Result<(), String> {
     println!("cargo:rustc-link-lib=static=bzlarng");
     println!("cargo:rustc-link-lib=dylib=stdc++");
     println!("cargo:rustc-link-lib=dylib=gmp");
+    println!("cargo:rustc-link-lib=dylib=mpfr");
     Ok(())
 }
