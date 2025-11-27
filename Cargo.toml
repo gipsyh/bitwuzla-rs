@@ -1,5 +1,5 @@
 [package]
-name = "bitwuzla-rs"
+name = "smtif-bitwuzla"
 version = "0.1.0"
 edition = "2024"
 
