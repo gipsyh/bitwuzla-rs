@@ -1,5 +1,7 @@
+mod ops;
+mod option;
+
 use giputils::hash::GHashMap;
-use logicrs::fol::op::{self, DynOp};
 use logicrs::fol::{BvConst, OpTerm, Sort, Term, TermType};
 use std::ffi::{CString, c_void};
 
@@ -26,93 +28,16 @@ unsafe extern "C" {
     ) -> *mut c_void;
     fn bitwuzla_assert(bitwuzla: *mut c_void, term: *mut c_void);
     fn bitwuzla_check_sat(bitwuzla: *mut c_void) -> u32;
+    fn bitwuzla_check_sat_assuming(
+        bitwuzla: *mut c_void,
+        argc: u32,
+        args: *const *mut c_void,
+    ) -> u32;
     fn bitwuzla_push(bitwuzla: *mut c_void, nlevels: u64);
     fn bitwuzla_pop(bitwuzla: *mut c_void, nlevels: u64);
-}
-
-#[repr(u32)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum BitwuzlaOp {
-    Constant,
-    ConstArray,
-    Value,
-    Variable,
-    And,
-    Distinct,
-    Equal,
-    Iff,
-    Implies,
-    Not,
-    Or,
-    Xor,
-    Ite,
-    Exists,
-    Forall,
-    Apply,
-    Lambda,
-    ArraySelect,
-    ArrayStore,
-    BvAdd,
-    BvAnd,
-    BvAshr,
-    BvComp,
-    BvConcat,
-    BvDec,
-    BvInc,
-    BvMul,
-    BvNand,
-    BvNeg,
-    BvNegOverflow,
-    BvNor,
-    BvNot,
-    BvOr,
-    BvRedand,
-    BvRedor,
-    BvRedxor,
-    BvRol,
-    BvRor,
-    BvSaddOverflow,
-    BvSdivOverflow,
-    BvSdiv,
-    BvSge,
-    BvSgt,
-    BvShl,
-    BvShr,
-    BvSle,
-    BvSlt,
-    BvSmod,
-    BvSmulOverflow,
-    BvSrem,
-    BvSsubOverflow,
-    BvSub,
-    BvUaddOverflow,
-    BvUdiv,
-    BvUge,
-    BvUgt,
-    BvUle,
-    BvUlt,
-    BvUmulOverflow,
-    BvUrem,
-    BvUsubOverflow,
-    BvXnor,
-    BvXor,
-    BvExtract,
-    BvRepeat,
-    BvRoli,
-    BvRori,
-    BvSignExtend,
-    BvZeroExtend,
-}
-
-lazy_static::lazy_static! {
-    static ref OP_MAP: GHashMap<DynOp, BitwuzlaOp> = {
-        let mut m = GHashMap::new();
-        m.insert(DynOp::from(op::Add), BitwuzlaOp::BvAdd);
-        m.insert(DynOp::from(op::Eq), BitwuzlaOp::Equal);
-        m.insert(DynOp::from(op::Not), BitwuzlaOp::Not);
-        m.insert(DynOp::from(op::Neq), BitwuzlaOp::Distinct);
-        m
-    };
+    fn bitwuzla_get_value(bitwuzla: *mut c_void, term: *mut c_void) -> *mut c_void;
+    fn bitwuzla_term_value_get_str(term: *mut c_void) -> *const i8;
+    fn bitwuzla_set_option(op: *mut c_void, option: u32, val: u64);
 }
 
 pub struct Bitwuzla {
@@ -123,18 +48,6 @@ pub struct Bitwuzla {
 }
 
 impl Bitwuzla {
-    pub fn new() -> Self {
-        let tm = unsafe { bitwuzla_term_manager_new() };
-        let op = unsafe { bitwuzla_options_new() };
-        let bitwuzla = unsafe { bitwuzla_new(tm, op) };
-        Self {
-            tm,
-            op,
-            bitwuzla,
-            term_map: GHashMap::new(),
-        }
-    }
-
     fn convert_sort(&self, sort: Sort) -> *mut c_void {
         match sort {
             Sort::Bv(w) => unsafe { bitwuzla_mk_bv_sort(self.tm, w as u64) },
@@ -190,11 +103,26 @@ impl Bitwuzla {
         // }
 
         let args: Vec<*mut c_void> = op_term.terms.iter().map(|t| self.convert_term(t)).collect();
-        let kind = *OP_MAP
+        let kind = *ops::OP_MAP
             .get(&op_term.op)
             .unwrap_or_else(|| panic!("unsupport op {:?}", op_term.op));
 
         unsafe { bitwuzla_mk_term(self.tm, kind as u32, args.len() as u32, args.as_ptr()) }
+    }
+}
+
+impl Bitwuzla {
+    pub fn new() -> Self {
+        let tm = unsafe { bitwuzla_term_manager_new() };
+        let op = unsafe { bitwuzla_options_new() };
+        unsafe { bitwuzla_set_option(op, option::BitwuzlaOption::ProduceModels as u32, 1) };
+        let bitwuzla = unsafe { bitwuzla_new(tm, op) };
+        Self {
+            tm,
+            op,
+            bitwuzla,
+            term_map: GHashMap::new(),
+        }
     }
 
     pub fn assert(&mut self, t: &Term) {
@@ -202,8 +130,22 @@ impl Bitwuzla {
         unsafe { bitwuzla_assert(self.bitwuzla, term) }
     }
 
-    pub fn solve(&mut self) -> bool {
-        unsafe { bitwuzla_check_sat(self.bitwuzla) == 10 }
+    pub fn solve<'a>(&mut self, assumps: impl IntoIterator<Item = &'a Term>) -> bool {
+        let assumps: Vec<*mut c_void> = assumps
+            .into_iter()
+            .map(|t| {
+                debug_assert!(t.is_bool());
+                self.convert_term(t)
+            })
+            .collect();
+        let res = if assumps.is_empty() {
+            unsafe { bitwuzla_check_sat(self.bitwuzla) }
+        } else {
+            unsafe {
+                bitwuzla_check_sat_assuming(self.bitwuzla, assumps.len() as u32, assumps.as_ptr())
+            }
+        };
+        res == 10
     }
 
     pub fn push(&mut self, nlevels: usize) {
@@ -212,6 +154,15 @@ impl Bitwuzla {
 
     pub fn pop(&mut self, nlevels: usize) {
         unsafe { bitwuzla_pop(self.bitwuzla, nlevels as _) }
+    }
+
+    pub fn sat_value(&mut self, term: &Term) -> BvConst {
+        let t = self.convert_term(term);
+        let val = unsafe { bitwuzla_get_value(self.bitwuzla, t) };
+        let s_ptr = unsafe { bitwuzla_term_value_get_str(val) };
+        let s = unsafe { std::ffi::CStr::from_ptr(s_ptr).to_string_lossy() };
+        let bits: Vec<bool> = s.chars().rev().map(|c| c == '1').collect();
+        BvConst::new(&bits)
     }
 }
 
@@ -239,6 +190,20 @@ mod tests {
         let a_add_b = a.op1(op::Add, &b);
         let b_add_a = b.op1(op::Add, &a);
         bzla.assert(&a_add_b.op1(op::Neq, &b_add_a));
-        assert!(!bzla.solve());
+        assert!(!bzla.solve([]));
+    }
+
+    #[test]
+    fn test1() {
+        let mut bzla = Bitwuzla::new();
+        let a = Term::new_var(Sort::Bv(2));
+        let b = Term::new_var(Sort::Bv(2));
+        let a_add_b = &a + &b;
+        let b_add_a = &b + &a;
+        // let a_eq_2 = a.op1(op::Eq, BvConst::from_usize(2, 2))
+        bzla.assert(&a_add_b.op1(op::Eq, &b_add_a));
+        assert!(bzla.solve([]));
+        println!("a = {:?}", bzla.sat_value(&a));
+        println!("b = {:?}", bzla.sat_value(&b));
     }
 }
