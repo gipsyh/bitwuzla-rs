@@ -2,7 +2,7 @@ mod ops;
 mod option;
 
 use giputils::hash::GHashMap;
-use logicrs::fol::{BvConst, OpTerm, Sort, Term, TermType};
+use logicrs::fol::{BvConst, OpTerm, Sort, Term, TermType, op};
 use std::ffi::{CString, c_void};
 
 unsafe extern "C" {
@@ -20,6 +20,7 @@ unsafe extern "C" {
         value: *const i8,
         base: u8,
     ) -> *mut c_void;
+    fn bitwuzla_mk_bv_value_uint64(tm: *mut c_void, sort: *mut c_void, value: u64) -> *mut c_void;
     fn bitwuzla_mk_term(
         tm: *mut c_void,
         kind: u32,
@@ -46,9 +47,48 @@ pub struct Bitwuzla {
     op: *mut c_void,
     bitwuzla: *mut c_void,
     term_map: GHashMap<Term, *mut c_void>,
+    bv1_one: *mut c_void,
+    bv1_zero: *mut c_void,
+    bv2bool: GHashMap<*mut c_void, *mut c_void>,
+    bool2bv: GHashMap<*mut c_void, *mut c_void>,
 }
 
 impl Bitwuzla {
+    #[inline]
+    fn bv1_to_bool(&mut self, bv1: *mut c_void) -> *mut c_void {
+        if let Some(r) = self.bv2bool.get(&bv1) {
+            return *r;
+        }
+        let r = unsafe {
+            bitwuzla_mk_term(
+                self.tm,
+                ops::BitwuzlaOp::Equal as u32,
+                2,
+                [bv1, self.bv1_one].as_ptr(),
+            )
+        };
+        self.bv2bool.insert(bv1, r);
+        self.bool2bv.insert(r, bv1);
+        r
+    }
+
+    fn bool_to_bv1(&mut self, b: *mut c_void) -> *mut c_void {
+        if let Some(r) = self.bool2bv.get(&b) {
+            return *r;
+        }
+        let r = unsafe {
+            bitwuzla_mk_term(
+                self.tm,
+                ops::BitwuzlaOp::Ite as u32,
+                3,
+                [b, self.bv1_one, self.bv1_zero].as_ptr(),
+            )
+        };
+        self.bv2bool.insert(r, b);
+        self.bool2bv.insert(b, r);
+        r
+    }
+
     fn convert_sort(&self, sort: Sort) -> *mut c_void {
         match sort {
             Sort::Bv(w) => unsafe { bitwuzla_mk_bv_sort(self.tm, w as u64) },
@@ -87,28 +127,33 @@ impl Bitwuzla {
     }
 
     fn convert_op(&mut self, op_term: &OpTerm) -> *mut c_void {
-        // let name = op_term.op.name();
-        // if name == "Slice" {
-        //     let arg = self.convert_term(&op_term.terms[0]);
-        //     let h = op_term.terms[1].bv_len() as u64;
-        //     let l = op_term.terms[2].bv_len() as u64;
-        //     return unsafe {
-        //         bitwuzla_mk_term1_indexed2(self.tm, BitwuzlaOp::BvExtract as u32, arg, h, l)
-        //     };
-        // } else if name == "Sext" {
-        //     let arg = self.convert_term(&op_term.terms[0]);
-        //     let ext = op_term.terms[1].bv_len() as u64;
-        //     return unsafe {
-        //         bitwuzla_mk_term1_indexed1(self.tm, BitwuzlaOp::BvSignExtend as u32, arg, ext)
-        //     };
-        // }
+        let mut args: Vec<*mut c_void> =
+            op_term.terms.iter().map(|t| self.convert_term(t)).collect();
 
-        let args: Vec<*mut c_void> = op_term.terms.iter().map(|t| self.convert_term(t)).collect();
+        if op_term.op == op::Ite {
+            args[0] = self.bv1_to_bool(args[0]);
+        }
+        if op_term.op == op::Implies {
+            args[0] = self.bv1_to_bool(args[0]);
+            args[1] = self.bv1_to_bool(args[1]);
+        }
+
         let kind = *ops::OP_MAP
             .get(&op_term.op)
             .unwrap_or_else(|| panic!("unsupport op {:?}", op_term.op));
 
-        unsafe { bitwuzla_mk_term(self.tm, kind as u32, args.len() as u32, args.as_ptr()) }
+        let res =
+            unsafe { bitwuzla_mk_term(self.tm, kind as u32, args.len() as u32, args.as_ptr()) };
+
+        match kind {
+            ops::BitwuzlaOp::Equal
+            | ops::BitwuzlaOp::Distinct
+            | ops::BitwuzlaOp::BvUlt
+            | ops::BitwuzlaOp::BvUgt
+            | ops::BitwuzlaOp::BvSlt
+            | ops::BitwuzlaOp::BvSgt => self.bool_to_bv1(res),
+            _ => res,
+        }
     }
 }
 
@@ -118,16 +163,26 @@ impl Bitwuzla {
         let op = unsafe { bitwuzla_options_new() };
         unsafe { bitwuzla_set_option(op, option::BitwuzlaOption::ProduceModels as u32, 1) };
         let bitwuzla = unsafe { bitwuzla_new(tm, op) };
+
+        let bv1_sort = unsafe { bitwuzla_mk_bv_sort(tm, 1) };
+        let bv1_one = unsafe { bitwuzla_mk_bv_value_uint64(tm, bv1_sort, 1) };
+        let bv1_zero = unsafe { bitwuzla_mk_bv_value_uint64(tm, bv1_sort, 0) };
+
         Self {
             tm,
             op,
             bitwuzla,
             term_map: GHashMap::new(),
+            bv1_one,
+            bv1_zero,
+            bv2bool: GHashMap::new(),
+            bool2bv: GHashMap::new(),
         }
     }
 
     pub fn assert(&mut self, t: &Term) {
         let term = self.convert_term(t);
+        let term = self.bv1_to_bool(term);
         unsafe { bitwuzla_assert(self.bitwuzla, term) }
     }
 
@@ -136,7 +191,8 @@ impl Bitwuzla {
             .into_iter()
             .map(|t| {
                 debug_assert!(t.is_bool());
-                self.convert_term(t)
+                let term = self.convert_term(t);
+                self.bv1_to_bool(term)
             })
             .collect();
         let res = if assumps.is_empty() {
@@ -207,5 +263,13 @@ mod tests {
         assert!(bzla.solve(&[a_eq_2, a_eq_b]));
         assert!(bzla.sat_value(&a).eq(&bv2c2));
         assert!(bzla.sat_value(&b).eq(&bv2c2));
+    }
+
+    #[test]
+    fn test2() {
+        let mut bzla = Bitwuzla::new();
+        let bv1c1 = BvConst::from_usize(1, 1);
+        let t_bv1c1 = Term::bv_const(bv1c1);
+        bzla.assert(&t_bv1c1);
     }
 }

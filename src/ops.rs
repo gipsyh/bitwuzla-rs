@@ -88,10 +88,10 @@ lazy_static::lazy_static! {
         m.insert(DynOp::from(op::Srem), BitwuzlaOp::BvSrem);
         m.insert(DynOp::from(op::Eq), BitwuzlaOp::Equal);
         m.insert(DynOp::from(op::Neq), BitwuzlaOp::Distinct);
-        m.insert(DynOp::from(op::Not), BitwuzlaOp::Not);
-        m.insert(DynOp::from(op::And), BitwuzlaOp::And);
-        m.insert(DynOp::from(op::Or), BitwuzlaOp::Or);
-        m.insert(DynOp::from(op::Xor), BitwuzlaOp::Xor);
+        m.insert(DynOp::from(op::Not), BitwuzlaOp::BvNot);
+        m.insert(DynOp::from(op::And), BitwuzlaOp::BvAnd);
+        m.insert(DynOp::from(op::Or), BitwuzlaOp::BvOr);
+        m.insert(DynOp::from(op::Xor), BitwuzlaOp::BvXor);
         m.insert(DynOp::from(op::Implies), BitwuzlaOp::Implies);
         m.insert(DynOp::from(op::Ite), BitwuzlaOp::Ite);
         m.insert(DynOp::from(op::Ult), BitwuzlaOp::BvUlt);
