@@ -37,6 +37,7 @@ unsafe extern "C" {
     fn bitwuzla_pop(bitwuzla: *mut c_void, nlevels: u64);
     fn bitwuzla_get_value(bitwuzla: *mut c_void, term: *mut c_void) -> *mut c_void;
     fn bitwuzla_term_value_get_str(term: *mut c_void) -> *const i8;
+    fn bitwuzla_term_is_value(term: *mut c_void) -> bool;
     fn bitwuzla_set_option(op: *mut c_void, option: u32, val: u64);
 }
 
@@ -51,7 +52,7 @@ impl Bitwuzla {
     fn convert_sort(&self, sort: Sort) -> *mut c_void {
         match sort {
             Sort::Bv(w) => unsafe { bitwuzla_mk_bv_sort(self.tm, w as u64) },
-            _ => todo!("support other sorts"),
+            _ => todo!("unsupport other sorts"),
         }
     }
 
@@ -159,6 +160,7 @@ impl Bitwuzla {
     pub fn sat_value(&mut self, term: &Term) -> BvConst {
         let t = self.convert_term(term);
         let val = unsafe { bitwuzla_get_value(self.bitwuzla, t) };
+        debug_assert!(unsafe { bitwuzla_term_is_value(val) });
         let s_ptr = unsafe { bitwuzla_term_value_get_str(val) };
         let s = unsafe { std::ffi::CStr::from_ptr(s_ptr).to_string_lossy() };
         let bits: Vec<bool> = s.chars().rev().map(|c| c == '1').collect();
@@ -196,14 +198,14 @@ mod tests {
     #[test]
     fn test1() {
         let mut bzla = Bitwuzla::new();
+        let bv2c2 = BvConst::from_usize(2, 2);
+        let t_bv2c2 = Term::bv_const(bv2c2.clone());
         let a = Term::new_var(Sort::Bv(2));
         let b = Term::new_var(Sort::Bv(2));
-        let a_add_b = &a + &b;
-        let b_add_a = &b + &a;
-        // let a_eq_2 = a.op1(op::Eq, BvConst::from_usize(2, 2))
-        bzla.assert(&a_add_b.op1(op::Eq, &b_add_a));
-        assert!(bzla.solve([]));
-        println!("a = {:?}", bzla.sat_value(&a));
-        println!("b = {:?}", bzla.sat_value(&b));
+        let a_eq_2 = a.op1(op::Eq, &t_bv2c2);
+        let a_eq_b = a.op1(op::Eq, &b);
+        assert!(bzla.solve(&[a_eq_2, a_eq_b]));
+        assert!(bzla.sat_value(&a).eq(&bv2c2));
+        assert!(bzla.sat_value(&b).eq(&bv2c2));
     }
 }

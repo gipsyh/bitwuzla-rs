@@ -80,9 +80,27 @@ lazy_static::lazy_static! {
     pub(crate) static ref OP_MAP: GHashMap<DynOp, BitwuzlaOp> = {
         let mut m = GHashMap::new();
         m.insert(DynOp::from(op::Add), BitwuzlaOp::BvAdd);
+        m.insert(DynOp::from(op::Sub), BitwuzlaOp::BvSub);
+        m.insert(DynOp::from(op::Mul), BitwuzlaOp::BvMul);
+        m.insert(DynOp::from(op::Udiv), BitwuzlaOp::BvUdiv);
+        m.insert(DynOp::from(op::Sdiv), BitwuzlaOp::BvSdiv);
+        m.insert(DynOp::from(op::Urem), BitwuzlaOp::BvUrem);
+        m.insert(DynOp::from(op::Srem), BitwuzlaOp::BvSrem);
         m.insert(DynOp::from(op::Eq), BitwuzlaOp::Equal);
-        m.insert(DynOp::from(op::Not), BitwuzlaOp::Not);
         m.insert(DynOp::from(op::Neq), BitwuzlaOp::Distinct);
+        m.insert(DynOp::from(op::Not), BitwuzlaOp::Not);
+        m.insert(DynOp::from(op::And), BitwuzlaOp::And);
+        m.insert(DynOp::from(op::Or), BitwuzlaOp::Or);
+        m.insert(DynOp::from(op::Xor), BitwuzlaOp::Xor);
+        m.insert(DynOp::from(op::Implies), BitwuzlaOp::Implies);
+        m.insert(DynOp::from(op::Ite), BitwuzlaOp::Ite);
+        m.insert(DynOp::from(op::Ult), BitwuzlaOp::BvUlt);
+        m.insert(DynOp::from(op::Ugt), BitwuzlaOp::BvUgt);
+        m.insert(DynOp::from(op::Slt), BitwuzlaOp::BvSlt);
+        m.insert(DynOp::from(op::Sgt), BitwuzlaOp::BvSgt);
+
+        // m.insert(DynOp::from(op::Concat), BitwuzlaOp::BvConcat);
+
         m
     };
 }
