@@ -27,6 +27,13 @@ unsafe extern "C" {
         argc: u32,
         args: *const *mut c_void,
     ) -> *mut c_void;
+    fn bitwuzla_mk_term1_indexed2(
+        tm: *mut c_void,
+        kind: u32,
+        arg: *mut c_void,
+        idx0: u64,
+        idx1: u64,
+    ) -> *mut c_void;
     fn bitwuzla_assert(bitwuzla: *mut c_void, term: *mut c_void);
     fn bitwuzla_check_sat(bitwuzla: *mut c_void) -> u32;
     fn bitwuzla_check_sat_assuming(
@@ -127,6 +134,15 @@ impl Bitwuzla {
     }
 
     fn convert_op(&mut self, op_term: &OpTerm) -> *mut c_void {
+        if op_term.op == op::Slice {
+            let arg = self.convert_term(&op_term.terms[0]);
+            let h = op_term.terms[1].bv_len() as u64;
+            let l = op_term.terms[2].bv_len() as u64;
+            return unsafe {
+                bitwuzla_mk_term1_indexed2(self.tm, ops::BitwuzlaOp::BvExtract as u32, arg, h, l)
+            };
+        }
+
         let mut args: Vec<*mut c_void> =
             op_term.terms.iter().map(|t| self.convert_term(t)).collect();
 
@@ -291,5 +307,20 @@ mod tests {
         let t_bv5c3 = Term::bv_const(bv5c3);
         let tneq = t_bv5c3.tneq(&t_bv3c0.concat(&t_bv2c3));
         assert!(!bzla.solve(&[tneq]));
+    }
+
+    #[test]
+    fn slice() {
+        let mut bzla = Bitwuzla::new();
+        let a = Term::new_var(Sort::Bv(4));
+        let slice = a.slice(1, 3);
+
+        let c14 = Term::bv_const(BvConst::from_usize(14, 4));
+        bzla.assert(&a.teq(&c14));
+
+        assert!(bzla.solve([]));
+
+        let val = bzla.sat_value(&slice);
+        assert_eq!(val, BvConst::from_usize(7, 3));
     }
 }
