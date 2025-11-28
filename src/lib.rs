@@ -232,6 +232,13 @@ impl Drop for Bitwuzla {
     }
 }
 
+impl Default for Bitwuzla {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -271,5 +278,18 @@ mod tests {
         let bv1c1 = BvConst::from_usize(1, 1);
         let t_bv1c1 = Term::bv_const(bv1c1);
         bzla.assert(&t_bv1c1);
+    }
+
+    #[test]
+    fn concat() {
+        let mut bzla = Bitwuzla::new();
+        let bv2c3 = BvConst::from_usize(3, 2);
+        let t_bv2c3 = Term::bv_const(bv2c3);
+        let bv3c0 = BvConst::from_usize(0, 3);
+        let t_bv3c0 = Term::bv_const(bv3c0);
+        let bv5c3 = BvConst::from_usize(3, 5);
+        let t_bv5c3 = Term::bv_const(bv5c3);
+        let tneq = t_bv5c3.tneq(&t_bv3c0.concat(&t_bv2c3));
+        assert!(!bzla.solve(&[tneq]));
     }
 }

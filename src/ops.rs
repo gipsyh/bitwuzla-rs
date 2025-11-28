@@ -98,8 +98,7 @@ lazy_static::lazy_static! {
         m.insert(DynOp::from(op::Ugt), BitwuzlaOp::BvUgt);
         m.insert(DynOp::from(op::Slt), BitwuzlaOp::BvSlt);
         m.insert(DynOp::from(op::Sgt), BitwuzlaOp::BvSgt);
-
-        // m.insert(DynOp::from(op::Concat), BitwuzlaOp::BvConcat);
+        m.insert(DynOp::from(op::Concat), BitwuzlaOp::BvConcat);
 
         m
     };
