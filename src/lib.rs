@@ -34,6 +34,12 @@ unsafe extern "C" {
         idx0: u64,
         idx1: u64,
     ) -> *mut c_void;
+    fn bitwuzla_mk_term1_indexed1(
+        tm: *mut c_void,
+        kind: u32,
+        arg: *mut c_void,
+        idx0: u64,
+    ) -> *mut c_void;
     fn bitwuzla_assert(bitwuzla: *mut c_void, term: *mut c_void);
     fn bitwuzla_check_sat(bitwuzla: *mut c_void) -> u32;
     fn bitwuzla_check_sat_assuming(
@@ -140,6 +146,18 @@ impl Bitwuzla {
             let l = op_term.terms[2].bv_len() as u64;
             return unsafe {
                 bitwuzla_mk_term1_indexed2(self.tm, ops::BitwuzlaOp::BvExtract as u32, arg, h, l)
+            };
+        } else if op_term.op == op::Sext {
+            let arg = self.convert_term(&op_term.terms[0]);
+            let w = op_term.terms[1].bv_len() as u64;
+            return unsafe {
+                bitwuzla_mk_term1_indexed1(self.tm, ops::BitwuzlaOp::BvSignExtend as u32, arg, w)
+            };
+        } else if op_term.op == op::Uext {
+            let arg = self.convert_term(&op_term.terms[0]);
+            let w = op_term.terms[1].bv_len() as u64;
+            return unsafe {
+                bitwuzla_mk_term1_indexed1(self.tm, ops::BitwuzlaOp::BvZeroExtend as u32, arg, w)
             };
         }
 
