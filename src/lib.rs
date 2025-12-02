@@ -1,8 +1,8 @@
 mod ops;
 mod option;
 
-use giputils::hash::GHashMap;
-use logicrs::fol::{BvConst, OpTerm, Sort, Term, TermType, op};
+use giputils::{bitvec::BitVec, hash::GHashMap};
+use logicrs::fol::{OpTerm, Sort, Term, TermType, op};
 use std::ffi::{CString, c_void};
 
 unsafe extern "C" {
@@ -124,12 +124,9 @@ impl Bitwuzla {
         res
     }
 
-    fn convert_const(&self, c: &BvConst, sort: Sort) -> *mut c_void {
+    fn convert_const(&self, c: &BitVec, sort: Sort) -> *mut c_void {
         let sort_ptr = self.convert_sort(sort);
-        let mut s = String::new();
-        for b in c.iter().rev() {
-            s.push(if *b { '1' } else { '0' });
-        }
+        let s = format!("{}", c);
         let c_str = CString::new(s).unwrap();
         unsafe { bitwuzla_mk_bv_value(self.tm, sort_ptr, c_str.as_ptr(), 2) }
     }
@@ -247,14 +244,14 @@ impl Bitwuzla {
         unsafe { bitwuzla_pop(self.bitwuzla, nlevels as _) }
     }
 
-    pub fn sat_value(&mut self, term: &Term) -> BvConst {
+    pub fn sat_value(&mut self, term: &Term) -> BitVec {
         let t = self.convert_term(term);
         let val = unsafe { bitwuzla_get_value(self.bitwuzla, t) };
         debug_assert!(unsafe { bitwuzla_term_is_value(val) });
         let s_ptr = unsafe { bitwuzla_term_value_get_str(val) };
         let s = unsafe { std::ffi::CStr::from_ptr(s_ptr).to_string_lossy() };
         let bits: Vec<bool> = s.chars().rev().map(|c| c == '1').collect();
-        BvConst::new(&bits)
+        BitVec::from(&bits)
     }
 }
 
@@ -295,7 +292,7 @@ mod tests {
     #[test]
     fn test1() {
         let mut bzla = Bitwuzla::new();
-        let bv2c2 = BvConst::from_usize(2, 2);
+        let bv2c2 = BitVec::from_usize(2, 2);
         let t_bv2c2 = Term::bv_const(bv2c2.clone());
         let a = Term::new_var(Sort::Bv(2));
         let b = Term::new_var(Sort::Bv(2));
@@ -309,7 +306,7 @@ mod tests {
     #[test]
     fn test2() {
         let mut bzla = Bitwuzla::new();
-        let bv1c1 = BvConst::from_usize(1, 1);
+        let bv1c1 = BitVec::from_usize(1, 1);
         let t_bv1c1 = Term::bv_const(bv1c1);
         bzla.assert(&t_bv1c1);
     }
@@ -317,11 +314,11 @@ mod tests {
     #[test]
     fn concat() {
         let mut bzla = Bitwuzla::new();
-        let bv2c3 = BvConst::from_usize(3, 2);
+        let bv2c3 = BitVec::from_usize(2, 3);
         let t_bv2c3 = Term::bv_const(bv2c3);
-        let bv3c0 = BvConst::from_usize(0, 3);
+        let bv3c0 = BitVec::from_usize(3, 0);
         let t_bv3c0 = Term::bv_const(bv3c0);
-        let bv5c3 = BvConst::from_usize(3, 5);
+        let bv5c3 = BitVec::from_usize(5, 3);
         let t_bv5c3 = Term::bv_const(bv5c3);
         let tneq = t_bv5c3.tneq(&t_bv3c0.concat(&t_bv2c3));
         assert!(!bzla.solve(&[tneq]));
@@ -333,12 +330,12 @@ mod tests {
         let a = Term::new_var(Sort::Bv(4));
         let slice = a.slice(1, 3);
 
-        let c14 = Term::bv_const(BvConst::from_usize(14, 4));
+        let c14 = Term::bv_const(BitVec::from_usize(4, 14));
         bzla.assert(&a.teq(&c14));
 
         assert!(bzla.solve([]));
 
         let val = bzla.sat_value(&slice);
-        assert_eq!(val, BvConst::from_usize(7, 3));
+        assert_eq!(val, BitVec::from_usize(3, 7));
     }
 }
