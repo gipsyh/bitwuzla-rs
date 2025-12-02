@@ -244,14 +244,14 @@ impl Bitwuzla {
         unsafe { bitwuzla_pop(self.bitwuzla, nlevels as _) }
     }
 
-    pub fn sat_value(&mut self, term: &Term) -> BitVec {
+    pub fn sat_value(&mut self, term: &Term) -> Option<BitVec> {
         let t = self.convert_term(term);
         let val = unsafe { bitwuzla_get_value(self.bitwuzla, t) };
         debug_assert!(unsafe { bitwuzla_term_is_value(val) });
         let s_ptr = unsafe { bitwuzla_term_value_get_str(val) };
         let s = unsafe { std::ffi::CStr::from_ptr(s_ptr).to_string_lossy() };
         let bits: Vec<bool> = s.chars().rev().map(|c| c == '1').collect();
-        BitVec::from(&bits)
+        Some(BitVec::from(&bits))
     }
 }
 
@@ -299,8 +299,8 @@ mod tests {
         let a_eq_2 = a.op1(op::Eq, &t_bv2c2);
         let a_eq_b = a.op1(op::Eq, &b);
         assert!(bzla.solve(&[a_eq_2, a_eq_b]));
-        assert!(bzla.sat_value(&a).eq(&bv2c2));
-        assert!(bzla.sat_value(&b).eq(&bv2c2));
+        assert!(bzla.sat_value(&a).unwrap().eq(&bv2c2));
+        assert!(bzla.sat_value(&b).unwrap().eq(&bv2c2));
     }
 
     #[test]
@@ -329,13 +329,10 @@ mod tests {
         let mut bzla = Bitwuzla::new();
         let a = Term::new_var(Sort::Bv(4));
         let slice = a.slice(1, 3);
-
         let c14 = Term::bv_const(BitVec::from_usize(4, 14));
         bzla.assert(&a.teq(&c14));
-
         assert!(bzla.solve([]));
-
         let val = bzla.sat_value(&slice);
-        assert_eq!(val, BitVec::from_usize(3, 7));
+        assert_eq!(val.unwrap(), BitVec::from_usize(3, 7));
     }
 }
