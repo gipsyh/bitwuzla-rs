@@ -37,7 +37,10 @@ fn main() -> Result<(), String> {
     println!("cargo:rustc-link-lib=static=bitwuzlabv");
     println!("cargo:rustc-link-lib=static=bitwuzlals");
     println!("cargo:rustc-link-lib=static=bzlarng");
+    #[cfg(target_os = "linux")]
     println!("cargo:rustc-link-lib=dylib=stdc++");
+    #[cfg(target_os = "macos")]
+    println!("cargo:rustc-link-lib=dylib=c++");
     println!("cargo:rustc-link-lib=dylib=gmp");
     println!("cargo:rustc-link-lib=dylib=mpfr");
     Ok(())
