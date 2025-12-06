@@ -104,7 +104,11 @@ lazy_static::lazy_static! {
         m.insert(DynOp::from(op::Sra), BitwuzlaOp::BvAshr);
         m.insert(DynOp::from(op::Sext), BitwuzlaOp::BvSignExtend);
         m.insert(DynOp::from(op::Uext), BitwuzlaOp::BvZeroExtend);
-
+        m.insert(DynOp::from(op::Rol), BitwuzlaOp::BvRol);
+        m.insert(DynOp::from(op::Ror), BitwuzlaOp::BvRor);
+        m.insert(DynOp::from(op::Redxor), BitwuzlaOp::BvRedxor);
+        m.insert(DynOp::from(op::Neg), BitwuzlaOp::BvNeg);
+        m.insert(DynOp::from(op::Smod), BitwuzlaOp::BvSmod);
         m
     };
 }
