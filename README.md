@@ -1,1 +1,1 @@
-Bitwuzla-rs
+# Bitwuzla-rs

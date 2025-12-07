@@ -2,11 +2,16 @@
 name = "smtif-bitwuzla"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+description = "Rust wrapper for the Bitwuzla SMT solver"
+repository = "https://github.com/gipsyh/bitwuzla-rs"
+authors = ["Yuheng Su <gipsyh.icu@gmail.com>"]
+
 
 [dependencies]
 lazy_static = "1.5.0"
-logicrs = { path = "../logicrs", version = "0.6.0" }
-giputils = { path = "../giputils", version = "0.3.5" }
+logicrs = { path = "../logicrs", version = "0.6.1" }
+giputils = { path = "../giputils", version = "0.3.6" }
 
 [build-dependencies]
-giputils = { path = "../giputils", version = "0.3.5" }
+giputils = { path = "../giputils", version = "0.3.6" }
