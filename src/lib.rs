@@ -270,6 +270,10 @@ impl Default for Bitwuzla {
     }
 }
 
+unsafe impl Sync for Bitwuzla {}
+
+unsafe impl Send for Bitwuzla {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
