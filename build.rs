@@ -1,27 +1,32 @@
-#![feature(exit_status_error)]
-
 extern crate giputils;
 use giputils::build::copy_build;
-use std::process::Command;
+use std::{io, process::Command};
 
-fn main() -> Result<(), String> {
+fn main() -> io::Result<()> {
     giputils::build::git_submodule_update()?;
     println!("cargo:rerun-if-changed=./bitwuzla");
     let cb_path = copy_build("bitwuzla", |src| {
-        Command::new("python3")
+        let status = Command::new("python3")
             .arg("configure.py")
             .current_dir(src)
-            .status()
-            .map_err(|e| e.to_string())?
-            .exit_ok()
-            .map_err(|e| e.to_string())?;
-        Command::new("meson")
+            .status()?;
+        if !status.success() {
+            return Err(io::Error::other(format!(
+                "configure.py failed with status: {}",
+                status
+            )));
+        }
+        let status = Command::new("meson")
             .arg("compile")
             .current_dir(src.join("build"))
-            .status()
-            .map_err(|e| e.to_string())?
-            .exit_ok()
-            .map_err(|e| e.to_string())
+            .status()?;
+        if !status.success() {
+            return Err(io::Error::other(format!(
+                "meson compile failed with status: {}",
+                status
+            )));
+        }
+        Ok(())
     })?;
     println!(
         "cargo:rustc-link-search=native={}",
