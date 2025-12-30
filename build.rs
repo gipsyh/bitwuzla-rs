@@ -56,18 +56,22 @@ fn build_vendor() -> io::Result<()> {
 #[cfg(not(feature = "vendor"))]
 fn link_system() -> io::Result<()> {
     if let Ok(output) = Command::new("pkg-config")
-        .args(["--libs", "--cflags", "bitwuzla"])
+        .args(["--libs", "bitwuzla"])
         .output()
         && output.status.success()
     {
         let flags = String::from_utf8_lossy(&output.stdout);
         for flag in flags.split_whitespace() {
             if let Some(lib) = flag.strip_prefix("-l") {
-                println!("cargo:rustc-link-lib={}", lib);
+                println!("cargo:rustc-link-lib=dylib={}", lib);
             } else if let Some(path) = flag.strip_prefix("-L") {
                 println!("cargo:rustc-link-search=native={}", path);
             }
         }
+        #[cfg(target_os = "linux")]
+        println!("cargo:rustc-link-lib=dylib=stdc++");
+        #[cfg(target_os = "macos")]
+        println!("cargo:rustc-link-lib=dylib=c++");
         return Ok(());
     }
     println!("cargo:rustc-link-lib=dylib=bitwuzla");
