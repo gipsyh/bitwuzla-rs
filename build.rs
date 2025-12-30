@@ -1,7 +1,9 @@
 extern crate giputils;
 #[cfg(feature = "vendor")]
 use giputils::build::copy_build;
-use std::{io, process::Command};
+use std::io;
+#[cfg(feature = "vendor")]
+use std::process::Command;
 
 #[cfg(feature = "vendor")]
 fn build_vendor() -> io::Result<()> {
@@ -55,18 +57,12 @@ fn build_vendor() -> io::Result<()> {
 
 #[cfg(not(feature = "vendor"))]
 fn link_system() -> io::Result<()> {
-    if let Ok(output) = Command::new("pkg-config")
-        .args(["--libs", "bitwuzla"])
-        .output()
-        && output.status.success()
-    {
-        let flags = String::from_utf8_lossy(&output.stdout);
-        for flag in flags.split_whitespace() {
-            if let Some(lib) = flag.strip_prefix("-l") {
-                println!("cargo:rustc-link-lib=dylib={}", lib);
-            } else if let Some(path) = flag.strip_prefix("-L") {
-                println!("cargo:rustc-link-search=native={}", path);
-            }
+    if let Ok(lib) = pkg_config::Config::new().probe("bitwuzla") {
+        for path in lib.link_paths {
+            println!("cargo:rustc-link-search=native={}", path.display());
+        }
+        for lib in lib.libs {
+            println!("cargo:rustc-link-lib=dylib={}", lib);
         }
         #[cfg(target_os = "linux")]
         println!("cargo:rustc-link-lib=dylib=stdc++");

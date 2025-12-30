@@ -15,6 +15,7 @@ giputils = { path = "../giputils", version = "0.3.6" }
 
 [build-dependencies]
 giputils = { path = "../giputils", version = "0.3.6" }
+pkg-config = "0.3.32"
 
 [features]
 vendor = []
