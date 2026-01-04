@@ -68,19 +68,19 @@ fn link_system() -> io::Result<()> {
         println!("cargo:rustc-link-lib=dylib=stdc++");
         #[cfg(target_os = "macos")]
         println!("cargo:rustc-link-lib=dylib=c++");
-        return Ok(());
+    } else {
+        println!(
+            "cargo:warning=Bitwuzla not found. The library will panic at runtime if used. Please install it from https://github.com/bitwuzla/bitwuzla"
+        );
+        println!("cargo:rustc-cfg=bitwuzla_stub");
     }
-    println!("cargo:rustc-link-lib=dylib=bitwuzla");
-    #[cfg(target_os = "linux")]
-    println!("cargo:rustc-link-lib=dylib=stdc++");
-    #[cfg(target_os = "macos")]
-    println!("cargo:rustc-link-lib=dylib=c++");
-    println!("cargo:rustc-link-lib=dylib=gmp");
-    println!("cargo:rustc-link-lib=dylib=mpfr");
     Ok(())
 }
 
 fn main() -> io::Result<()> {
+    // Declare bitwuzla_stub as a valid cfg
+    println!("cargo::rustc-check-cfg=cfg(bitwuzla_stub)");
+
     #[cfg(feature = "vendor")]
     build_vendor()?;
 
