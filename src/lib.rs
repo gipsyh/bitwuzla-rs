@@ -77,4 +77,44 @@ mod tests {
         let val = bzla.sat_value(&slice);
         assert_eq!(val.unwrap(), BitVec::from_usize(3, 7));
     }
+
+    #[test]
+    fn unsat_assumps_only_returns_conflicting_assumptions() {
+        let mut bzla = Bitwuzla::new();
+        let x = Term::new_var(Sort::Bv(2));
+        let y = Term::new_var(Sort::Bv(2));
+        let x_eq_0 = x.teq(Term::bv_const(BitVec::from_usize(2, 0)));
+        let x_eq_1 = x.teq(Term::bv_const(BitVec::from_usize(2, 1)));
+        let y_eq_0 = y.teq(Term::bv_const(BitVec::from_usize(2, 0)));
+
+        assert!(!bzla.solve([&x_eq_0, &x_eq_1, &y_eq_0]));
+
+        let unsat_assumptions = bzla.unsat_assump();
+        assert_eq!(unsat_assumptions.len(), 2);
+        assert!(unsat_assumptions.contains(&x_eq_0));
+        assert!(unsat_assumptions.contains(&x_eq_1));
+        assert!(!unsat_assumptions.contains(&y_eq_0));
+    }
+
+    #[test]
+    fn unsat_core_includes_assertions_and_assumptions() {
+        let mut bzla = Bitwuzla::new();
+        let x = Term::new_var(Sort::Bv(2));
+        let y = Term::new_var(Sort::Bv(2));
+        let x_eq_0 = x.teq(Term::bv_const(BitVec::from_usize(2, 0)));
+        let x_eq_1 = x.teq(Term::bv_const(BitVec::from_usize(2, 1)));
+        let y_eq_0 = y.teq(Term::bv_const(BitVec::from_usize(2, 0)));
+
+        bzla.assert(&x_eq_0);
+        assert!(!bzla.solve([&x_eq_1, &y_eq_0]));
+
+        let unsat_core = bzla.unsat_core();
+        assert_eq!(unsat_core.len(), 2);
+        assert!(unsat_core.contains(&x_eq_0));
+        assert!(unsat_core.contains(&x_eq_1));
+        assert!(!unsat_core.contains(&y_eq_0));
+
+        let unsat_assumptions = bzla.unsat_assump();
+        assert_eq!(unsat_assumptions, vec![x_eq_1]);
+    }
 }

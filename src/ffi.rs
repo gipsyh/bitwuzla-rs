@@ -1,9 +1,7 @@
-use std::ffi::{CString, c_void};
-
+use crate::{ops, option};
 use giputils::{bitvec::BitVec, hash::GHashMap};
 use logicrs::fol::{OpTerm, Sort, Term, TermType, op};
-
-use crate::{ops, option};
+use std::ffi::{CString, c_void};
 
 unsafe extern "C" {
     fn bitwuzla_term_manager_new() -> *mut c_void;
@@ -47,6 +45,11 @@ unsafe extern "C" {
         argc: u32,
         args: *const *mut c_void,
     ) -> u32;
+    fn bitwuzla_get_unsat_assumptions(
+        bitwuzla: *mut c_void,
+        size: *mut usize,
+    ) -> *const *mut c_void;
+    fn bitwuzla_get_unsat_core(bitwuzla: *mut c_void, size: *mut usize) -> *const *mut c_void;
     fn bitwuzla_push(bitwuzla: *mut c_void, nlevels: u64);
     fn bitwuzla_pop(bitwuzla: *mut c_void, nlevels: u64);
     fn bitwuzla_get_value(bitwuzla: *mut c_void, term: *mut c_void) -> *mut c_void;
@@ -60,6 +63,7 @@ pub struct Bitwuzla {
     op: *mut c_void,
     bitwuzla: *mut c_void,
     term_map: GHashMap<Term, *mut c_void>,
+    rev_term_map: GHashMap<*mut c_void, Term>,
     bv1_one: *mut c_void,
     bv1_zero: *mut c_void,
     bv2bool: GHashMap<*mut c_void, *mut c_void>,
@@ -121,7 +125,16 @@ impl Bitwuzla {
         };
 
         self.term_map.insert(term.clone(), res);
+        self.rev_term_map.insert(res, term.clone());
         res
+    }
+
+    fn restore_term(&self, term: *mut c_void) -> Option<Term> {
+        self.rev_term_map.get(&term).cloned().or_else(|| {
+            self.bool2bv
+                .get(&term)
+                .and_then(|t| self.rev_term_map.get(t).cloned())
+        })
     }
 
     fn convert_const(&self, c: &BitVec, sort: Sort) -> *mut c_void {
@@ -193,6 +206,14 @@ impl Bitwuzla {
         let tm = unsafe { bitwuzla_term_manager_new() };
         let op = unsafe { bitwuzla_options_new() };
         unsafe { bitwuzla_set_option(op, option::BitwuzlaOption::ProduceModels as u32, 1) };
+        unsafe {
+            bitwuzla_set_option(
+                op,
+                option::BitwuzlaOption::ProduceUnsatAssumptions as u32,
+                1,
+            )
+        };
+        unsafe { bitwuzla_set_option(op, option::BitwuzlaOption::ProduceUnsatCores as u32, 1) };
         let bitwuzla = unsafe { bitwuzla_new(tm, op) };
 
         let bv1_sort = unsafe { bitwuzla_mk_bv_sort(tm, 1) };
@@ -204,6 +225,7 @@ impl Bitwuzla {
             op,
             bitwuzla,
             term_map: GHashMap::new(),
+            rev_term_map: GHashMap::new(),
             bv1_one,
             bv1_zero,
             bv2bool: GHashMap::new(),
@@ -252,6 +274,20 @@ impl Bitwuzla {
         let s = unsafe { std::ffi::CStr::from_ptr(s_ptr).to_string_lossy() };
         let bits: Vec<bool> = s.chars().rev().map(|c| c == '1').collect();
         Some(BitVec::from(&bits))
+    }
+
+    pub fn unsat_assump(&self) -> Vec<Term> {
+        let mut size = 0;
+        let data = unsafe { bitwuzla_get_unsat_assumptions(self.bitwuzla, &mut size) };
+        let data = unsafe { std::slice::from_raw_parts(data, size) };
+        data.iter().filter_map(|&t| self.restore_term(t)).collect()
+    }
+
+    pub fn unsat_core(&self) -> Vec<Term> {
+        let mut size = 0;
+        let data = unsafe { bitwuzla_get_unsat_core(self.bitwuzla, &mut size) };
+        let data = unsafe { std::slice::from_raw_parts(data, size) };
+        data.iter().filter_map(|&t| self.restore_term(t)).collect()
     }
 }
 

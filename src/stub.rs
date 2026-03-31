@@ -29,6 +29,14 @@ impl Bitwuzla {
     pub fn sat_value(&mut self, _term: &Term) -> Option<BitVec> {
         unreachable!()
     }
+
+    pub fn unsat_assump(&self) -> Vec<Term> {
+        unreachable!()
+    }
+
+    pub fn unsat_core(&self) -> Vec<Term> {
+        unreachable!()
+    }
 }
 
 impl Default for Bitwuzla {
