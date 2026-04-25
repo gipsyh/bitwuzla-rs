@@ -1,7 +1,8 @@
-use crate::{ops, option};
 use giputils::{bitvec::BitVec, hash::GHashMap};
-use logicrs::fol::{OpTerm, Sort, Term, TermType, op};
+use logicrs::fol::{FolOp, OpTerm, Sort, Term, TermType};
 use std::ffi::{CString, c_void};
+
+use crate::{ops::BitwuzlaOp, option};
 
 unsafe extern "C" {
     fn bitwuzla_term_manager_new() -> *mut c_void;
@@ -79,7 +80,7 @@ impl Bitwuzla {
         let r = unsafe {
             bitwuzla_mk_term(
                 self.tm,
-                ops::BitwuzlaOp::Equal as u32,
+                BitwuzlaOp::Equal as u32,
                 2,
                 [bv1, self.bv1_one].as_ptr(),
             )
@@ -96,7 +97,7 @@ impl Bitwuzla {
         let r = unsafe {
             bitwuzla_mk_term(
                 self.tm,
-                ops::BitwuzlaOp::Ite as u32,
+                BitwuzlaOp::Ite as u32,
                 3,
                 [b, self.bv1_one, self.bv1_zero].as_ptr(),
             )
@@ -150,52 +151,50 @@ impl Bitwuzla {
     }
 
     fn convert_op(&mut self, op_term: &OpTerm) -> *mut c_void {
-        if op_term.op == op::Slice {
+        if op_term.op == FolOp::Slice {
             let arg = self.convert_term(&op_term.terms[0]);
             let h = op_term.terms[1].bv_len() as u64;
             let l = op_term.terms[2].bv_len() as u64;
             return unsafe {
-                bitwuzla_mk_term1_indexed2(self.tm, ops::BitwuzlaOp::BvExtract as u32, arg, h, l)
+                bitwuzla_mk_term1_indexed2(self.tm, BitwuzlaOp::BvExtract as u32, arg, h, l)
             };
-        } else if op_term.op == op::Sext {
+        } else if op_term.op == FolOp::Sext {
             let arg = self.convert_term(&op_term.terms[0]);
             let w = op_term.terms[1].bv_len() as u64;
             return unsafe {
-                bitwuzla_mk_term1_indexed1(self.tm, ops::BitwuzlaOp::BvSignExtend as u32, arg, w)
+                bitwuzla_mk_term1_indexed1(self.tm, BitwuzlaOp::BvSignExtend as u32, arg, w)
             };
-        } else if op_term.op == op::Uext {
+        } else if op_term.op == FolOp::Uext {
             let arg = self.convert_term(&op_term.terms[0]);
             let w = op_term.terms[1].bv_len() as u64;
             return unsafe {
-                bitwuzla_mk_term1_indexed1(self.tm, ops::BitwuzlaOp::BvZeroExtend as u32, arg, w)
+                bitwuzla_mk_term1_indexed1(self.tm, BitwuzlaOp::BvZeroExtend as u32, arg, w)
             };
         }
 
         let mut args: Vec<*mut c_void> =
             op_term.terms.iter().map(|t| self.convert_term(t)).collect();
 
-        if op_term.op == op::Ite {
+        if op_term.op == FolOp::Ite {
             args[0] = self.bv1_to_bool(args[0]);
         }
-        if op_term.op == op::Implies {
+        if op_term.op == FolOp::Implies {
             args[0] = self.bv1_to_bool(args[0]);
             args[1] = self.bv1_to_bool(args[1]);
         }
 
-        let kind = *ops::OP_MAP
-            .get(&op_term.op)
-            .unwrap_or_else(|| panic!("unsupport op {:?}", op_term.op));
+        let kind = op_term.op.into();
 
         let res =
             unsafe { bitwuzla_mk_term(self.tm, kind as u32, args.len() as u32, args.as_ptr()) };
 
         match kind {
-            ops::BitwuzlaOp::Equal
-            | ops::BitwuzlaOp::Distinct
-            | ops::BitwuzlaOp::BvUlt
-            | ops::BitwuzlaOp::BvUgt
-            | ops::BitwuzlaOp::BvSlt
-            | ops::BitwuzlaOp::BvSgt => self.bool_to_bv1(res),
+            BitwuzlaOp::Equal
+            | BitwuzlaOp::Distinct
+            | BitwuzlaOp::BvUlt
+            | BitwuzlaOp::BvUgt
+            | BitwuzlaOp::BvSlt
+            | BitwuzlaOp::BvSgt => self.bool_to_bv1(res),
             _ => res,
         }
     }

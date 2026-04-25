@@ -15,19 +15,16 @@ pub use ffi::Bitwuzla;
 mod tests {
     use super::*;
     use giputils::bitvec::BitVec;
-    use logicrs::fol::{
-        Sort, Term,
-        op::{self},
-    };
+    use logicrs::fol::{FolOp, Sort, Term};
 
     #[test]
     fn test0() {
         let mut bzla = Bitwuzla::new();
         let a = Term::new_var(Sort::Bv(2));
         let b = Term::new_var(Sort::Bv(2));
-        let a_add_b = a.op1(op::Add, &b);
-        let b_add_a = b.op1(op::Add, &a);
-        bzla.assert(&a_add_b.op1(op::Neq, &b_add_a));
+        let a_add_b = a.op1(FolOp::Add, &b);
+        let b_add_a = b.op1(FolOp::Add, &a);
+        bzla.assert(&a_add_b.op1(FolOp::Neq, &b_add_a));
         assert!(!bzla.solve([]));
     }
 
@@ -38,8 +35,8 @@ mod tests {
         let t_bv2c2 = Term::bv_const(bv2c2.clone());
         let a = Term::new_var(Sort::Bv(2));
         let b = Term::new_var(Sort::Bv(2));
-        let a_eq_2 = a.op1(op::Eq, &t_bv2c2);
-        let a_eq_b = a.op1(op::Eq, &b);
+        let a_eq_2 = a.op1(FolOp::Eq, &t_bv2c2);
+        let a_eq_b = a.op1(FolOp::Eq, &b);
         assert!(bzla.solve(&[a_eq_2, a_eq_b]));
         assert!(bzla.sat_value(&a).unwrap().eq(&bv2c2));
         assert!(bzla.sat_value(&b).unwrap().eq(&bv2c2));
