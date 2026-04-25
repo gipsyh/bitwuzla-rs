@@ -59,7 +59,7 @@ fn build_vendor() -> io::Result<()> {
 fn link_system() -> io::Result<()> {
     if let Ok(lib) = pkg_config::Config::new().probe("bitwuzla") {
         for path in lib.link_paths {
-            println!("cargo:rustc-link-search=native={}", path.display());
+            println!("cargo:rustc-link-arg=-Wl,-rpath,{}", path.display());
         }
         for lib in lib.libs {
             println!("cargo:rustc-link-lib=dylib={}", lib);
