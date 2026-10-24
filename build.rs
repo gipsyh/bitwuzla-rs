@@ -1,6 +1,7 @@
 extern crate giputils;
 #[cfg(feature = "vendor")]
 use giputils::build::copy_build;
+use giputils::build::link_cxx_stdlib;
 use std::io;
 #[cfg(feature = "vendor")]
 use std::process::Command;
@@ -46,10 +47,7 @@ fn build_vendor() -> io::Result<()> {
     println!("cargo:rustc-link-lib=static=bitwuzlabv");
     println!("cargo:rustc-link-lib=static=bitwuzlals");
     println!("cargo:rustc-link-lib=static=bzlarng");
-    #[cfg(target_os = "linux")]
-    println!("cargo:rustc-link-lib=dylib=stdc++");
-    #[cfg(target_os = "macos")]
-    println!("cargo:rustc-link-lib=dylib=c++");
+    link_cxx_stdlib();
     println!("cargo:rustc-link-lib=dylib=gmp");
     println!("cargo:rustc-link-lib=dylib=mpfr");
     Ok(())
@@ -64,10 +62,7 @@ fn link_system() -> io::Result<()> {
         for lib in lib.libs {
             println!("cargo:rustc-link-lib=dylib={}", lib);
         }
-        #[cfg(target_os = "linux")]
-        println!("cargo:rustc-link-lib=dylib=stdc++");
-        #[cfg(target_os = "macos")]
-        println!("cargo:rustc-link-lib=dylib=c++");
+        link_cxx_stdlib();
     } else {
         println!(
             "cargo:warning=Bitwuzla not found. The library will panic at runtime if used. Please install it from https://github.com/bitwuzla/bitwuzla"
